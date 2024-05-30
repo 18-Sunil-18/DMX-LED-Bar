@@ -1,17 +1,11 @@
-//#define FunktionRelais    // Wenn Aktiviert Sound Aus
 #define FunktionLED
 #define FunktionSound
 #define FunktionDMX
-//#define FunktionSerial
+//#define FunktionSerial    // Wenn Aktiviert, FunktionDMX Deaktivieren
 //#define EEPROMschreiben
-//#define FunktionPoti    // Wenn Aktiviert FunktionLED Aktivieren
 
 // ------------------library-----------------------
 #include <Arduino.h>
-
-#ifdef FunktionDMX
-  #include <DMXSerial.h>
-#endif
 
 #ifdef FunktionLED
   #include <Adafruit_NeoPixel.h>
@@ -21,10 +15,10 @@
   #include <avr/power.h>
 #endif
 
-// ------------------DMX-----------------------
+// ------------------DMX-Werte-----------------------
 
 byte maxBrightness     = 200;    // brightness range [off..on] = [0..255], keep dim for less current draw
-byte brightness,
+volatile byte brightness,
      strobe,
      effect,
      effectspeed,
@@ -51,13 +45,35 @@ byte brightness,
      bluLevel_7,
      redLevel_8,
      grnLevel_8,
-     bluLevel_8,
-     relaisLevel_1,
-     relaisLevel_2,
-     relaisLevel_3,
-     relaisLevel_4,
-     relaisLevel_5,
-     relaisLevel_6;
+     bluLevel_8;
+
+volatile byte Prevbrightness = 0,
+     PrevRedLevel_1 = 0,
+     PrevGreenLevel_1 = 0,
+     PrevBlueLevel_1 = 0,
+     PrevRedLevel_2 = 0,
+     PrevGreenLevel_2 = 0,
+     PrevBlueLevel_2 = 0,
+     PrevRedLevel_3 = 0,
+     PrevGreenLevel_3 = 0,
+     PrevBlueLevel_3 = 0,
+     PrevRedLevel_4 = 0,
+     PrevGreenLevel_4 = 0,
+     PrevBlueLevel_4 = 0,
+     PrevRedLevel_5 = 0,
+     PrevGreenLevel_5 = 0,
+     PrevBlueLevel_5 = 0,
+     PrevRedLevel_6 = 0,
+     PrevGreenLevel_6 = 0,
+     PrevBlueLevel_6 = 0,
+     PrevRedLevel_7 = 0,
+     PrevGreenLevel_7 = 0,
+     PrevBlueLevel_7 = 0,
+     PrevRedLevel_8 = 0,
+     PrevGreenLevel_8 = 0,
+     PrevBlueLevel_8 = 0;
+
+// ------------------DMX-Channel-----------------------
 
 byte brightnessCh      =   0,   // DMX channel offsets from base channel
      strobeCh          =   1,
@@ -86,13 +102,21 @@ byte brightnessCh      =   0,   // DMX channel offsets from base channel
      bluCh_7           =   24,
      redCh_8           =   25,
      grnCh_8           =   26,
-     bluCh_8           =   27,
-     relaisCh_1        =   7,
-     relaisCh_2        =   8,
-     relaisCh_3        =   9,
-     relaisCh_4        =   10,
-     relaisCh_5        =   11,
-     relaisCh_6        =   12;
+     bluCh_8           =   27;
+
+// Zeit für Strobe
+unsigned long prevMillStrobe = 0;
+
+// Zeit für DMX Auslesen
+unsigned long prevMillDMX = 0;
+
+// Zeit für Taster
+unsigned long previousMillis = 0;
+
+// Strobe Halbiert
+int StrobeHalb;
+
+// ------------------LED-----------------------
 
 #define PIN 13 // Hier wird angegeben, an welchem digitalen Pin die WS2812 LEDs bzw. NeoPixel angeschlossen sind
 #define NUMPIXELS 60 // Hier wird die AndmxBaseCh der angeschlossenen WS2812 LEDs bzw. NeoPixel angegeben
@@ -123,6 +147,14 @@ int Segment_1a = 29,    // CH 10
   Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 #endif
 
+// ------------------DMXSerial-----------------------
+
+#ifdef FunktionDMX
+  #include <DMXSerial.h>
+#endif
+
+#define DMXMODEPIN 2
+extern DMXSerialClass DMXSerial;
 
 // ------------------TM1637Display-----------------------
 #include <TM1637Display.h>
@@ -190,30 +222,6 @@ int sound_digital = 8,
     sound_analog = A0;
 #endif
 
-#ifdef FunktionRelais
-// ------------------Sound-----------------------
-int sound_digital = 12,
-    sound_analog = A0;
-#endif
-
-// ------------------Relais-----------------------
-int relais_1 = 8,
-    relais_2 = 9,
-    relais_3 = 2,
-    relais_4 = 3,
-    relais_5 = A2,
-    relais_6 = A3;
-    
-
-// Wert Relais schalten
-int WertRelaisHigh = 200,
-    WertRelaisLow = 10;
-
-int RelaisAnAus1 = 0,
-    RelaisAnAus2 = 1;
-
-int RelaisDMXversatz;
-
 // ------------------Variabeln-----------------------
 int dmxBaseCh,    // DMX-Adresse
     stelle,
@@ -229,7 +237,6 @@ int DMX_Modus_Nix,
     DMX_Adresse_einstellen,
     Channel_einstellen,
     Autoprogramme;
-
 
 // ------------Autoprogramme-------------------------------------------------------------------------
 
@@ -511,228 +518,99 @@ void ansteuern_4h(int r, int g, int b){
 }
 #endif
 
-#ifdef FunktionRelais
-void RelaisStartWerte(){
-  // ------------------Relais-----------------------
-  digitalWrite(relais_1, RelaisAnAus2);
-  digitalWrite(relais_2, RelaisAnAus2);
-  digitalWrite(relais_3, RelaisAnAus2);
-  digitalWrite(relais_4, RelaisAnAus2);
-  digitalWrite(relais_5, RelaisAnAus2);
-  digitalWrite(relais_6, RelaisAnAus2);
-}
-
-void DMXwerteRelais(){
-  if(Speicher_Channel == 7){
-    RelaisDMXversatz = 0;
-  }
-  if(Speicher_Channel == 10){
-    RelaisDMXversatz = 3;
-  }
-  if(Speicher_Channel == 16){
-    RelaisDMXversatz = 9;
-  }
-  if(Speicher_Channel == 22){
-    RelaisDMXversatz = 15;
-  }
-  if(Speicher_Channel == 28){
-    RelaisDMXversatz = 21;
-  }
-  relaisLevel_1 = DMXSerial.read(dmxBaseCh + RelaisDMXversatz + relaisCh_1);     // Dmx Relais Wert auslesen
-  relaisLevel_2 = DMXSerial.read(dmxBaseCh + RelaisDMXversatz + relaisCh_2);     // Dmx Relais Wert auslesen
-  relaisLevel_3 = DMXSerial.read(dmxBaseCh + RelaisDMXversatz + relaisCh_3);     // Dmx Relais Wert auslesen
-  relaisLevel_4 = DMXSerial.read(dmxBaseCh + RelaisDMXversatz + relaisCh_4);     // Dmx Relais Wert auslesen
-  relaisLevel_5 = DMXSerial.read(dmxBaseCh + RelaisDMXversatz + relaisCh_5);     // Dmx Relais Wert auslesen
-  relaisLevel_6 = DMXSerial.read(dmxBaseCh + RelaisDMXversatz + relaisCh_6);     // Dmx Relais Wert auslesen
-}
-
-void AnsteuernRelais(){
-  if(relaisLevel_1 > WertRelaisHigh){
-    digitalWrite(relais_1, RelaisAnAus1);
-  }
-  if(relaisLevel_1 < WertRelaisLow){
-    digitalWrite(relais_1, RelaisAnAus2);
-  }
-
-
-  if(relaisLevel_2 > WertRelaisHigh){
-    digitalWrite(relais_2, RelaisAnAus1);
-  }
-  if(relaisLevel_2 < WertRelaisLow){
-    digitalWrite(relais_2, RelaisAnAus2);
-  }
-
-
-  if(relaisLevel_3 > WertRelaisHigh){
-    digitalWrite(relais_3, RelaisAnAus1);
-  }
-  if(relaisLevel_3 < WertRelaisLow){
-    digitalWrite(relais_3, RelaisAnAus2);
-  }
-
-
-  if(relaisLevel_4 > WertRelaisHigh){
-    digitalWrite(relais_4, RelaisAnAus1);
-  }
-  if(relaisLevel_4 < WertRelaisLow){
-    digitalWrite(relais_4, RelaisAnAus2);
-  }
-
-
-  if(relaisLevel_5 > WertRelaisHigh){
-    digitalWrite(relais_5, RelaisAnAus1);
-  }
-  if(relaisLevel_5 < WertRelaisLow){
-    digitalWrite(relais_5, RelaisAnAus2);
-  }
-
-
-  if(relaisLevel_6 > WertRelaisHigh){
-    digitalWrite(relais_6, RelaisAnAus1);
-  }
-  if(relaisLevel_6 < WertRelaisLow){
-    digitalWrite(relais_6, RelaisAnAus2);
-  }
-}
-#endif
-
 #ifdef FunktionDMX
 void DMXauslesen(){
-  #ifdef FunktionRelais
-    DMXwerteRelais();
-  #endif
+  PrevRedLevel_1 = redLevel_1;  PrevGreenLevel_1 = grnLevel_1;  PrevBlueLevel_1 = bluLevel_1;
+  PrevRedLevel_2 = redLevel_2;  PrevGreenLevel_2 = grnLevel_2;  PrevBlueLevel_2 = bluLevel_2;
+  PrevRedLevel_3 = redLevel_3;  PrevGreenLevel_3 = grnLevel_3;  PrevBlueLevel_3 = bluLevel_3;
+  PrevRedLevel_4 = redLevel_4;  PrevGreenLevel_4 = grnLevel_4;  PrevBlueLevel_4 = bluLevel_4;
+  PrevRedLevel_5 = redLevel_5;  PrevGreenLevel_5 = grnLevel_5;  PrevBlueLevel_5 = bluLevel_5;
+  PrevRedLevel_6 = redLevel_6;  PrevGreenLevel_6 = grnLevel_6;  PrevBlueLevel_6 = bluLevel_6;
+  PrevRedLevel_7 = redLevel_7;  PrevGreenLevel_7 = grnLevel_7;  PrevBlueLevel_7 = bluLevel_7;
+  PrevRedLevel_8 = redLevel_8;  PrevGreenLevel_8 = grnLevel_8;  PrevBlueLevel_8 = bluLevel_8;
+  //Prevbrightness = brightness;
+
+  unsigned long curMillDMX = millis();
+
+    delay(50);
+    effect = DMXSerial.read(dmxBaseCh + effectCh);     // Dmx Effect Wert auslesen
+    effectspeed = DMXSerial.read(dmxBaseCh + effectspeedCh);     // Dmx Effect Speed Wert auslesen
+    
+    redLevel_1 = DMXSerial.read(dmxBaseCh + redCh_1);     // Dmx Rot Wert auslesen
+    grnLevel_1 = DMXSerial.read(dmxBaseCh + grnCh_1);     // Dmx Grün Wert auslesen
+    bluLevel_1 = DMXSerial.read(dmxBaseCh + bluCh_1);     // Dmx Blau Wert auslesen
+    
+    // Segmente
+    redLevel_2 = DMXSerial.read(dmxBaseCh + redCh_2);     // Dmx Rot Wert auslesen
+    grnLevel_2 = DMXSerial.read(dmxBaseCh + grnCh_2);     // Dmx Grün Wert auslesen
+    bluLevel_2 = DMXSerial.read(dmxBaseCh + bluCh_2);     // Dmx Blau Wert auslesen
+    
+    redLevel_3 = DMXSerial.read(dmxBaseCh + redCh_3);     // Dmx Rot Wert auslesen
+    grnLevel_3 = DMXSerial.read(dmxBaseCh + grnCh_3);     // Dmx Grün Wert auslesen
+    bluLevel_3 = DMXSerial.read(dmxBaseCh + bluCh_3);     // Dmx Blau Wert auslesen
+    
+    redLevel_4 = DMXSerial.read(dmxBaseCh + redCh_4);     // Dmx Rot Wert auslesen
+    grnLevel_4 = DMXSerial.read(dmxBaseCh + grnCh_4);     // Dmx Grün Wert auslesen
+    bluLevel_4 = DMXSerial.read(dmxBaseCh + bluCh_4);     // Dmx Blau Wert auslesen
   
-  effect = DMXSerial.read(dmxBaseCh + effectCh);     // Dmx Effect Wert auslesen
-  effectspeed = DMXSerial.read(dmxBaseCh + effectspeedCh);     // Dmx Effect Speed Wert auslesen
+    redLevel_5 = DMXSerial.read(dmxBaseCh + redCh_5);     // Dmx Rot Wert auslesen
+    grnLevel_5 = DMXSerial.read(dmxBaseCh + grnCh_5);     // Dmx Grün Wert auslesen
+    bluLevel_5 = DMXSerial.read(dmxBaseCh + bluCh_5);     // Dmx Blau Wert auslesen
   
-  redLevel_1 = DMXSerial.read(dmxBaseCh + redCh_1);     // Dmx Rot Wert auslesen
-  grnLevel_1 = DMXSerial.read(dmxBaseCh + grnCh_1);     // Dmx Grün Wert auslesen
-  bluLevel_1 = DMXSerial.read(dmxBaseCh + bluCh_1);     // Dmx Blau Wert auslesen
+    redLevel_6 = DMXSerial.read(dmxBaseCh + redCh_6);     // Dmx Rot Wert auslesen
+    grnLevel_6 = DMXSerial.read(dmxBaseCh + grnCh_6);     // Dmx Grün Wert auslesen
+    bluLevel_6 = DMXSerial.read(dmxBaseCh + bluCh_6);     // Dmx Blau Wert auslesen
   
-  // Segmente
-  redLevel_2 = DMXSerial.read(dmxBaseCh + redCh_2);     // Dmx Rot Wert auslesen
-  grnLevel_2 = DMXSerial.read(dmxBaseCh + grnCh_2);     // Dmx Grün Wert auslesen
-  bluLevel_2 = DMXSerial.read(dmxBaseCh + bluCh_2);     // Dmx Blau Wert auslesen
+    redLevel_7 = DMXSerial.read(dmxBaseCh + redCh_7);     // Dmx Rot Wert auslesen
+    grnLevel_7 = DMXSerial.read(dmxBaseCh + grnCh_7);     // Dmx Grün Wert auslesen
+    bluLevel_7 = DMXSerial.read(dmxBaseCh + bluCh_7);     // Dmx Blau Wert auslesen
   
-  redLevel_3 = DMXSerial.read(dmxBaseCh + redCh_3);     // Dmx Rot Wert auslesen
-  grnLevel_3 = DMXSerial.read(dmxBaseCh + grnCh_3);     // Dmx Grün Wert auslesen
-  bluLevel_3 = DMXSerial.read(dmxBaseCh + bluCh_3);     // Dmx Blau Wert auslesen
+    redLevel_8 = DMXSerial.read(dmxBaseCh + redCh_8);     // Dmx Rot Wert auslesen
+    grnLevel_8 = DMXSerial.read(dmxBaseCh + grnCh_8);     // Dmx Grün Wert auslesen
+    bluLevel_8 = DMXSerial.read(dmxBaseCh + bluCh_8);     // Dmx Blau Wert auslesen
   
-  redLevel_4 = DMXSerial.read(dmxBaseCh + redCh_4);     // Dmx Rot Wert auslesen
-  grnLevel_4 = DMXSerial.read(dmxBaseCh + grnCh_4);     // Dmx Grün Wert auslesen
-  bluLevel_4 = DMXSerial.read(dmxBaseCh + bluCh_4);     // Dmx Blau Wert auslesen
+    
+    strobe = DMXSerial.read(dmxBaseCh + strobeCh);     // Dmx Strobe Wert auslesen
+    brightness = DMXSerial.read(dmxBaseCh + brightnessCh);     // Dmx Dimmer Wert auslesen
+    brightness = map(brightness, 1, 255, 0, maxBrightness);   // Dimmer Wert runter rechnen
 
-  redLevel_5 = DMXSerial.read(dmxBaseCh + redCh_5);     // Dmx Rot Wert auslesen
-  grnLevel_5 = DMXSerial.read(dmxBaseCh + grnCh_5);     // Dmx Grün Wert auslesen
-  bluLevel_5 = DMXSerial.read(dmxBaseCh + bluCh_5);     // Dmx Blau Wert auslesen
-
-  redLevel_6 = DMXSerial.read(dmxBaseCh + redCh_6);     // Dmx Rot Wert auslesen
-  grnLevel_6 = DMXSerial.read(dmxBaseCh + grnCh_6);     // Dmx Grün Wert auslesen
-  bluLevel_6 = DMXSerial.read(dmxBaseCh + bluCh_6);     // Dmx Blau Wert auslesen
-
-  redLevel_7 = DMXSerial.read(dmxBaseCh + redCh_7);     // Dmx Rot Wert auslesen
-  grnLevel_7 = DMXSerial.read(dmxBaseCh + grnCh_7);     // Dmx Grün Wert auslesen
-  bluLevel_7 = DMXSerial.read(dmxBaseCh + bluCh_7);     // Dmx Blau Wert auslesen
-
-  redLevel_8 = DMXSerial.read(dmxBaseCh + redCh_8);     // Dmx Rot Wert auslesen
-  grnLevel_8 = DMXSerial.read(dmxBaseCh + grnCh_8);     // Dmx Grün Wert auslesen
-  bluLevel_8 = DMXSerial.read(dmxBaseCh + bluCh_8);     // Dmx Blau Wert auslesen
-
+    redLevel_1 = float(redLevel_1) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    grnLevel_1 = float(grnLevel_1) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    bluLevel_1 = float(bluLevel_1) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
   
-  strobe = DMXSerial.read(dmxBaseCh + strobeCh);     // Dmx Strobe Wert auslesen
-  brightness = DMXSerial.read(dmxBaseCh + brightnessCh);     // Dmx Dimmer Wert auslesen
-  brightness = map(brightness, 1, 255, 0, maxBrightness);   // Dimmer Wert runter rechnen
-
-  redLevel_1 = float(redLevel_1) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  grnLevel_1 = float(grnLevel_1) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  bluLevel_1 = float(bluLevel_1) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-
-  // Segmente
-  redLevel_2 = float(redLevel_2) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  grnLevel_2 = float(grnLevel_2) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  bluLevel_2 = float(bluLevel_2) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-
-  redLevel_3 = float(redLevel_3) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  grnLevel_3 = float(grnLevel_3) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  bluLevel_3 = float(bluLevel_3) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-
-  redLevel_4 = float(redLevel_4) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  grnLevel_4 = float(grnLevel_4) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  bluLevel_4 = float(bluLevel_4) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-
-  redLevel_5 = float(redLevel_5) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  grnLevel_5 = float(grnLevel_5) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  bluLevel_5 = float(bluLevel_5) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-
-  redLevel_6 = float(redLevel_6) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  grnLevel_6 = float(grnLevel_6) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  bluLevel_6 = float(bluLevel_6) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-
-  redLevel_7 = float(redLevel_7) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  grnLevel_7 = float(grnLevel_7) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  bluLevel_7 = float(bluLevel_7) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-
-  redLevel_8 = float(redLevel_8) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  grnLevel_8 = float(grnLevel_8) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  bluLevel_8 = float(bluLevel_8) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    // Segmente
+    redLevel_2 = float(redLevel_2) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    grnLevel_2 = float(grnLevel_2) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    bluLevel_2 = float(bluLevel_2) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+  
+    redLevel_3 = float(redLevel_3) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    grnLevel_3 = float(grnLevel_3) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    bluLevel_3 = float(bluLevel_3) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+  
+    redLevel_4 = float(redLevel_4) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    grnLevel_4 = float(grnLevel_4) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    bluLevel_4 = float(bluLevel_4) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+  
+    redLevel_5 = float(redLevel_5) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    grnLevel_5 = float(grnLevel_5) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    bluLevel_5 = float(bluLevel_5) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+  
+    redLevel_6 = float(redLevel_6) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    grnLevel_6 = float(grnLevel_6) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    bluLevel_6 = float(bluLevel_6) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+  
+    redLevel_7 = float(redLevel_7) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    grnLevel_7 = float(grnLevel_7) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    bluLevel_7 = float(bluLevel_7) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+  
+    redLevel_8 = float(redLevel_8) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    grnLevel_8 = float(grnLevel_8) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
+    bluLevel_8 = float(bluLevel_8) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
 }
 
 // -------------------------------------------------------------------------------------
 
-void DMXsteuern(){
-  int wait = map(effectspeed, 0, 255, 0, 75); // Wert, untere Grenze, obere Grenze, untere Grenze Ziel, obere Grenze Ziel
-
-  if (effect < 9) {
-    #ifdef FunktionRelais
-      AnsteuernRelais();
-    #endif
-
-    #ifdef FunktionLED
-      // CH07
-      ansteuern(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern
-      
-      // CH10
-      ansteuern_1a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
-      ansteuern_1b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
-  
-      // CH16
-      ansteuern_2a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
-      ansteuern_2b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
-      ansteuern_2c(redLevel_3, grnLevel_3, bluLevel_3);    // RGB Farben ansteuern_3
-      ansteuern_2d(redLevel_4, grnLevel_4, bluLevel_4);    // RGB Farben ansteuern_4
-  
-      // CH22
-      ansteuern_3a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
-      ansteuern_3b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
-      ansteuern_3c(redLevel_3, grnLevel_3, bluLevel_3);    // RGB Farben ansteuern_3
-      ansteuern_3d(redLevel_4, grnLevel_4, bluLevel_4);    // RGB Farben ansteuern_4
-      ansteuern_3e(redLevel_5, grnLevel_5, bluLevel_5);    // RGB Farben ansteuern_5
-      ansteuern_3f(redLevel_6, grnLevel_6, bluLevel_6);    // RGB Farben ansteuern_6
-  
-      // CH28
-      ansteuern_4a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
-      ansteuern_4b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
-      ansteuern_4c(redLevel_3, grnLevel_3, bluLevel_3);    // RGB Farben ansteuern_3
-      ansteuern_4d(redLevel_4, grnLevel_4, bluLevel_4);    // RGB Farben ansteuern_4
-      ansteuern_4e(redLevel_5, grnLevel_5, bluLevel_5);    // RGB Farben ansteuern_5
-      ansteuern_4f(redLevel_6, grnLevel_6, bluLevel_6);    // RGB Farben ansteuern_6
-      ansteuern_4g(redLevel_7, grnLevel_7, bluLevel_7);    // RGB Farben ansteuern_7
-      ansteuern_4h(redLevel_8, grnLevel_8, bluLevel_8);    // RGB Farben ansteuern_8
-    #endif
-    
-  }
-  else if (effect < 30 && effect > 10){
-    rainbow(wait);
-  }
-  else if (effect < 50 && effect > 31){
-    Lauflicht_2(wait);
-  }
-  else if (effect < 255 && effect > 51){
-    Lauflicht_4_S();
-  }
-}
 #endif
-
 
 void dmxwertzeigen(){     // DMX Wert anzeigen d001
   display.showNumberDec(dmxBaseCh, false, 4, 0);
@@ -1048,10 +926,7 @@ void AnalogLichtSteuern(){
   #endif
 }
 
-
-
 // -------------------------------------------------------------------------------------
-
 
 void rainbow(int wait) {
   #ifdef FunktionLED
@@ -1208,32 +1083,25 @@ void Lauflicht_1(int wait_1_1, int wait_1_2){
   int wait_1_3 = random(wait_1_1, wait_1_2);
   switch(nummer){
     case 1:
-      AlleRot();
-      delay(wait_1_3);
+      AlleRot();  delay(wait_1_3);
       break;
     case 2:
-      AlleGruen();
-      delay(wait_1_3);
+      AlleGruen();  delay(wait_1_3);
       break;
     case 3:
-      AlleBlau();
-      delay(wait_1_3);
+      AlleBlau();  delay(wait_1_3);
       break;
     case 4:
-      AlleGelb();
-      delay(wait_1_3);
+      AlleGelb();  delay(wait_1_3);
       break;
     case 5:
-      AlleTuerkis();
-      delay(wait_1_3);
+      AlleTuerkis();  delay(wait_1_3);
       break;
     case 6:
-      AlleLila();
-      delay(wait_1_3);
+      AlleLila();  delay(wait_1_3);
       break;
     case 7:
-      AlleWeiss();
-      delay(wait_1_3);
+      AlleWeiss();  delay(wait_1_3);
       break;
   }
 }
@@ -1244,32 +1112,25 @@ void Lauflicht_2(int wait_2_1){
   int nummer = random(1, 8);
   switch(nummer){
     case 1:
-      AlleRot();
-      delay(wait_2_1);
+      AlleRot();  delay(wait_2_1);
       break;
     case 2:
-      AlleGruen();
-      delay(wait_2_1);
+      AlleGruen();  delay(wait_2_1);
       break;
     case 3:
-      AlleBlau();
-      delay(wait_2_1);
+      AlleBlau();  delay(wait_2_1);
       break;
     case 4:
-      AlleGelb();
-      delay(wait_2_1);
+      AlleGelb();  delay(wait_2_1);
       break;
     case 5:
-      AlleTuerkis();
-      delay(wait_2_1);
+      AlleTuerkis();  delay(wait_2_1);
       break;
     case 6:
-      AlleLila();
-      delay(wait_2_1);
+      AlleLila();  delay(wait_2_1);
       break;
     case 7:
-      AlleWeiss();
-      delay(wait_2_1);
+      AlleWeiss();  delay(wait_2_1);
       break;
   }
 }
@@ -1281,32 +1142,25 @@ void Lauflicht_3(int wait_3_1, int wait_3_2){
   int wait_3_3 = random(wait_3_1, wait_3_2);
   switch(nummer){
     case 1:
-      AlleRot();
-      delay(wait_3_3);
+      AlleRot();  delay(wait_3_3);
       break;
     case 2:
-      AlleGruen();
-      delay(wait_3_3);
+      AlleGruen();  delay(wait_3_3);
       break;
     case 3:
-      AlleBlau();
-      delay(wait_3_3);
+      AlleBlau();  delay(wait_3_3);
       break;
     case 4:
-      AlleGelb();
-      delay(wait_3_3);
+      AlleGelb();  delay(wait_3_3);
       break;
     case 5:
-      AlleTuerkis();
-      delay(wait_3_3);
+      AlleTuerkis();  delay(wait_3_3);
       break;
     case 6:
-      AlleLila();
-      delay(wait_3_3);
+      AlleLila();  delay(wait_3_3);
       break;
     case 7:
-      AlleWeiss();
-      delay(wait_3_3);
+      AlleWeiss();  delay(wait_3_3);
       break;
   }
 }
@@ -1352,32 +1206,25 @@ void Lauflicht_5(int wait_5){
   int nummer = random(1, 8);
   switch(nummer){
     case 1:
-      AlleRot_Reverse();
-      delay(wait_5);
+      AlleRot_Reverse();  delay(wait_5);
       break;
     case 2:
-      AlleGruen();
-      delay(wait_5);
+      AlleGruen();  delay(wait_5);
       break;
     case 3:
-      AlleBlau();
-      delay(wait_5);
+      AlleBlau();  delay(wait_5);
       break;
     case 4:
-      AlleGelb();
-      delay(wait_5);
+      AlleGelb();  delay(wait_5);
       break;
     case 5:
-      AlleTuerkis();
-      delay(wait_5);
+      AlleTuerkis();  delay(wait_5);
       break;
     case 6:
-      AlleLila();
-      delay(wait_5);
+      AlleLila();  delay(wait_5);
       break;
     case 7:
-      AlleWeiss_Reverse();
-      delay(wait_5);
+      AlleWeiss_Reverse();  delay(wait_5);
       break;
   }
 }
@@ -1397,7 +1244,7 @@ void HauptMenu(){
   }
 
   switch(Hauptmenuezaehler){
-    case 1:
+    case 1:   // DMX Modus
       #ifdef FunktionSerial
         Serial.println("DMX-Modus-Nix");
       #endif
@@ -1428,7 +1275,7 @@ void HauptMenu(){
         }
       }
       break;
-    case 2:
+    case 2:   // DMX-Adresse einstellen
       #ifdef FunktionSerial
         Serial.println("DMX-Adresse");
       #endif
@@ -1452,7 +1299,7 @@ void HauptMenu(){
       }
       
       break;
-    case 3:
+    case 3:   // Channel einstellen
       #ifdef FunktionSerial
         Serial.println("Channel");
       #endif
@@ -1476,7 +1323,7 @@ void HauptMenu(){
       }
       
       break;
-    case 4:
+    case 4:   // Autoprogramme
       #ifdef FunktionSerial
         Serial.println("Autoprogramme");
       #endif
@@ -1493,6 +1340,7 @@ void HauptMenu(){
           if(Hauptmenuezaehler >= 5){
             Hauptmenuezaehler = 1;
           }
+          AlleAus();
           return;
         }
       }
@@ -1501,81 +1349,147 @@ void HauptMenu(){
   }
 }
 
-#ifdef FunktionPoti
-void PotiAuslesen(){
-  PotiWert_1 = 0.6 * PotiWert_1 + 0.4 * analogRead(Poti_1);      // Werte glätten 0.6 * PotiWert_1 + 0.4 * 
-  PotiWert_2 = 0.6 * PotiWert_2 + 0.4 * analogRead(Poti_2);
-  PotiWert_3 = 0.6 * PotiWert_3 + 0.4 * analogRead(Poti_3);
-  PotiWert_4 = 0.6 * PotiWert_4 + 0.4 * analogRead(Poti_4);
-  
-  /*#ifdef FunktionSerial
-    Serial.print("Poti_1"); Serial.print("\t");
-    Serial.print("Poti_2"); Serial.print("\t");
-    Serial.print("Poti_3"); Serial.print("\t");
-    Serial.print("Poti_4"); Serial.println("\t");
-    Serial.print(PotiWert_1); Serial.print("\t");
-    Serial.print(PotiWert_2); Serial.print("\t");
-    Serial.print(PotiWert_3); Serial.print("\t");
-    Serial.print(PotiWert_4); Serial.println("\t");
-  #endif*/
+
+void DMXsteuern(){
+  int wait = map(effectspeed, 0, 255, 0, 75); // Wert, untere Grenze, obere Grenze, untere Grenze Ziel, obere Grenze Ziel
+    
+  if (effect < 9) {
+    #ifdef FunktionLED
+      //LedAnsteuern_1_8();
+      LedAnsteuern_11_88();
+    #endif
+    }
 }
 
-// -------------------------------------------------------------------------------------
-
-void PotiWertBerechnen(){
-  PotiWertNeu_1 = map(PotiWert_1, 0, 1023, 0, 255);   // Wert runter rechnen
-  PotiWertNeu_2 = map(PotiWert_2, 0, 1023, 0, 255);   // Wert runter rechnen
-  PotiWertNeu_3 = map(PotiWert_3, 0, 1023, 0, 255);   // Wert runter rechnen
-  PotiWertNeu_4 = map(PotiWert_4, 0, 1023, 0, 255);   // Wert runter rechnen
-
-  // PotiWertNeu_4 = float(PotiWertNeu_4) * (float(PotiWertNeu_1) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-  PotiWertNeu_2 = float(PotiWertNeu_2) * (float(PotiWertNeu_1) / float(255));    // Dimmer auf Farbe anwenden
-  PotiWertNeu_3 = float(PotiWertNeu_3) * (float(PotiWertNeu_1) / float(255));    // Dimmer auf Farbe anwenden
-  PotiWertNeu_4 = float(PotiWertNeu_4) * (float(PotiWertNeu_1) / float(255));    // Dimmer auf Farbe anwenden
+void LedAnsteuern_1_8(){
+  // CH07
+  if((redLevel_1 != PrevRedLevel_1) || (grnLevel_1 != PrevGreenLevel_1) || (bluLevel_1 != PrevBlueLevel_1)){    // Überprüfen ob sich ein Wert geändert hat, wenn ja dann neue Farbe ansteuern
+    ansteuern(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern
+  }
   
-  /*#ifdef FunktionSerial
-    Serial.print("Poti_1"); Serial.print("\t");
-    Serial.print("Poti_2"); Serial.print("\t");
-    Serial.print("Poti_3"); Serial.print("\t");
-    Serial.print("Poti_4"); Serial.println("\t");
-    Serial.print(PotiWertNeu_1); Serial.print("\t");
-    Serial.print(PotiWertNeu_2); Serial.print("\t");
-    Serial.print(PotiWertNeu_3); Serial.print("\t");
-    Serial.print(PotiWertNeu_4); Serial.println("\t");
-  #endif*/
+  // CH10
+  if((redLevel_1 != PrevRedLevel_1) || (grnLevel_1 != PrevGreenLevel_1) || (bluLevel_1 != PrevBlueLevel_1) || 
+    (redLevel_2 != PrevRedLevel_2) || (grnLevel_2 != PrevGreenLevel_2) || (bluLevel_2 != PrevBlueLevel_2)){    // Überprüfen ob sich ein Wert geändert hat, wenn ja dann neue Farbe ansteuern
+      ansteuern_1a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
+      ansteuern_1b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
+     }
+  
+  // CH16
+  if((redLevel_1 != PrevRedLevel_1) || (grnLevel_1 != PrevGreenLevel_1) || (bluLevel_1 != PrevBlueLevel_1) || 
+    (redLevel_2 != PrevRedLevel_2) || (grnLevel_2 != PrevGreenLevel_2) || (bluLevel_2 != PrevBlueLevel_2) || 
+    (redLevel_3 != PrevRedLevel_3) || (grnLevel_3 != PrevGreenLevel_3) || (bluLevel_3 != PrevBlueLevel_3) || 
+    (redLevel_4 != PrevRedLevel_4) || (grnLevel_4 != PrevGreenLevel_4) || (bluLevel_4 != PrevBlueLevel_4)){    // Überprüfen ob sich ein Wert geändert hat, wenn ja dann neue Farbe ansteuern
+      ansteuern_2a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
+      ansteuern_2b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
+      ansteuern_2c(redLevel_3, grnLevel_3, bluLevel_3);    // RGB Farben ansteuern_3
+      ansteuern_2d(redLevel_4, grnLevel_4, bluLevel_4);    // RGB Farben ansteuern_4
+     }
+
+  // CH22
+  if((redLevel_1 != PrevRedLevel_1) || (grnLevel_1 != PrevGreenLevel_1) || (bluLevel_1 != PrevBlueLevel_1) || 
+    (redLevel_2 != PrevRedLevel_2) || (grnLevel_2 != PrevGreenLevel_2) || (bluLevel_2 != PrevBlueLevel_2) || 
+    (redLevel_3 != PrevRedLevel_3) || (grnLevel_3 != PrevGreenLevel_3) || (bluLevel_3 != PrevBlueLevel_3) || 
+    (redLevel_4 != PrevRedLevel_4) || (grnLevel_4 != PrevGreenLevel_4) || (bluLevel_4 != PrevBlueLevel_4) || 
+    (redLevel_5 != PrevRedLevel_5) || (grnLevel_5 != PrevGreenLevel_5) || (bluLevel_5 != PrevBlueLevel_5) || 
+    (redLevel_6 != PrevRedLevel_6) || (grnLevel_6 != PrevGreenLevel_6) || (bluLevel_6 != PrevBlueLevel_6)){    // Überprüfen ob sich ein Wert geändert hat, wenn ja dann neue Farbe ansteuern
+      ansteuern_3a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
+      ansteuern_3b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
+      ansteuern_3c(redLevel_3, grnLevel_3, bluLevel_3);    // RGB Farben ansteuern_3
+      ansteuern_3d(redLevel_4, grnLevel_4, bluLevel_4);    // RGB Farben ansteuern_4
+      ansteuern_3e(redLevel_5, grnLevel_5, bluLevel_5);    // RGB Farben ansteuern_5
+      ansteuern_3f(redLevel_6, grnLevel_6, bluLevel_6);    // RGB Farben ansteuern_6
+    }
+
+  // CH28
+  if((redLevel_1 != PrevRedLevel_1) || (grnLevel_1 != PrevGreenLevel_1) || (bluLevel_1 != PrevBlueLevel_1) || 
+    (redLevel_2 != PrevRedLevel_2) || (grnLevel_2 != PrevGreenLevel_2) || (bluLevel_2 != PrevBlueLevel_2) || 
+    (redLevel_3 != PrevRedLevel_3) || (grnLevel_3 != PrevGreenLevel_3) || (bluLevel_3 != PrevBlueLevel_3) || 
+    (redLevel_4 != PrevRedLevel_4) || (grnLevel_4 != PrevGreenLevel_4) || (bluLevel_4 != PrevBlueLevel_4) || 
+    (redLevel_5 != PrevRedLevel_5) || (grnLevel_5 != PrevGreenLevel_5) || (bluLevel_5 != PrevBlueLevel_5) || 
+    (redLevel_6 != PrevRedLevel_6) || (grnLevel_6 != PrevGreenLevel_6) || (bluLevel_6 != PrevBlueLevel_6) || 
+    (redLevel_7 != PrevRedLevel_7) || (grnLevel_7 != PrevGreenLevel_7) || (bluLevel_7 != PrevBlueLevel_7) || 
+    (redLevel_8 != PrevRedLevel_8) || (grnLevel_8 != PrevGreenLevel_8) || (bluLevel_8 != PrevBlueLevel_8)){    // Überprüfen ob sich ein Wert geändert hat, wenn ja dann neue Farbe ansteuern
+      ansteuern_4a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
+      ansteuern_4b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
+      ansteuern_4c(redLevel_3, grnLevel_3, bluLevel_3);    // RGB Farben ansteuern_3
+      ansteuern_4d(redLevel_4, grnLevel_4, bluLevel_4);    // RGB Farben ansteuern_4
+      ansteuern_4e(redLevel_5, grnLevel_5, bluLevel_5);    // RGB Farben ansteuern_5
+      ansteuern_4f(redLevel_6, grnLevel_6, bluLevel_6);    // RGB Farben ansteuern_6
+      ansteuern_4g(redLevel_7, grnLevel_7, bluLevel_7);    // RGB Farben ansteuern_7
+      ansteuern_4h(redLevel_8, grnLevel_8, bluLevel_8);    // RGB Farben ansteuern_8
+    }
 }
-#endif
 
-void TasterAuslesen(){
-  StatusTasteUP = digitalRead(TasteUP);
-  StatusTasteDOWN = digitalRead(TasteDOWN);
-  StatusTasteMODE = digitalRead(TasteMODE);
-  StatusTasteENTER = digitalRead(TasteENTER);
 
-  #ifdef FunktionSerial
-    Serial.print("UP"); Serial.print("\t");
-    Serial.print("DOWN"); Serial.print("\t");
-    Serial.print("MODE"); Serial.print("\t");
-    Serial.print("Enter"); Serial.println("\t");
-    Serial.print(StatusTasteUP); Serial.print("\t");
-    Serial.print(StatusTasteDOWN); Serial.print("\t");
-    Serial.print(StatusTasteMODE); Serial.print("\t");
-    Serial.print(StatusTasteENTER); Serial.println("\t");
-  #endif
+void LedAnsteuern_11_88(){
+  // CH07
+  ansteuern(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern
+  // CH10
+  ansteuern_1a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
+  ansteuern_1b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
   
-  delay(100);
+  // CH16
+  ansteuern_2a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
+  ansteuern_2b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
+  ansteuern_2c(redLevel_3, grnLevel_3, bluLevel_3);    // RGB Farben ansteuern_3
+  ansteuern_2d(redLevel_4, grnLevel_4, bluLevel_4);    // RGB Farben ansteuern_4
+  
+  // CH22
+  ansteuern_3a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
+  ansteuern_3b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
+  ansteuern_3c(redLevel_3, grnLevel_3, bluLevel_3);    // RGB Farben ansteuern_3
+  ansteuern_3d(redLevel_4, grnLevel_4, bluLevel_4);    // RGB Farben ansteuern_4
+  ansteuern_3e(redLevel_5, grnLevel_5, bluLevel_5);    // RGB Farben ansteuern_5
+  ansteuern_3f(redLevel_6, grnLevel_6, bluLevel_6);    // RGB Farben ansteuern_6
+
+  // CH28
+  ansteuern_4a(redLevel_1, grnLevel_1, bluLevel_1);    // RGB Farben ansteuern_1
+  ansteuern_4b(redLevel_2, grnLevel_2, bluLevel_2);    // RGB Farben ansteuern_2
+  ansteuern_4c(redLevel_3, grnLevel_3, bluLevel_3);    // RGB Farben ansteuern_3
+  ansteuern_4d(redLevel_4, grnLevel_4, bluLevel_4);    // RGB Farben ansteuern_4
+  ansteuern_4e(redLevel_5, grnLevel_5, bluLevel_5);    // RGB Farben ansteuern_5
+  ansteuern_4f(redLevel_6, grnLevel_6, bluLevel_6);    // RGB Farben ansteuern_6
+  ansteuern_4g(redLevel_7, grnLevel_7, bluLevel_7);    // RGB Farben ansteuern_7
+  ansteuern_4h(redLevel_8, grnLevel_8, bluLevel_8);    // RGB Farben ansteuern_8
+}
+
+void TasterAuslesen(){  
+    StatusTasteUP = digitalRead(TasteUP);
+    StatusTasteDOWN = digitalRead(TasteDOWN);
+    StatusTasteMODE = digitalRead(TasteMODE);
+    StatusTasteENTER = digitalRead(TasteENTER);
+  
+    #ifdef FunktionSerial
+      Serial.print("UP"); Serial.print("\t");
+      Serial.print("DOWN"); Serial.print("\t");
+      Serial.print("MODE"); Serial.print("\t");
+      Serial.print("Enter"); Serial.println("\t");
+      Serial.print(StatusTasteUP); Serial.print("\t");
+      Serial.print(StatusTasteDOWN); Serial.print("\t");
+      Serial.print(StatusTasteMODE); Serial.print("\t");
+      Serial.print(StatusTasteENTER); Serial.println("\t");
+    #endif
+    
+    delay(100);
 }
 
 // -------------------------------------------------------------------------------------
 
 void TasterAuslesenDMXModus(){
-  StatusTasteMODE = digitalRead(TasteMODE);
-  StatusTasteENTER = digitalRead(TasteENTER);
-  #ifdef FunktionSerial
-    Serial.println(StatusTasteMODE);
-    Serial.println(StatusTasteENTER);
-  #endif
-  delay(50);
+  unsigned long currentMillis = millis();
+  
+  if (currentMillis - previousMillis >= 50) {
+    // save the last time you blinked the LED
+    previousMillis = currentMillis;
+  
+    StatusTasteMODE = digitalRead(TasteMODE);
+    StatusTasteENTER = digitalRead(TasteENTER);
+    #ifdef FunktionSerial
+      Serial.println(StatusTasteMODE);
+      Serial.println(StatusTasteENTER);
+    #endif
+    //delay(50);
+  }
 }
 
 void zaehlen(){     // DMX Adresse bei Wert Überschreitung (Hoch / Runter zählen) verändern 
@@ -1604,6 +1518,7 @@ void dmxBaseChberechnen(){
   }
   zaehlen();
 }
+
 
 void pruefenModeMenu(){
   if(ModeMenueZaehler < 1){
@@ -1647,7 +1562,7 @@ void pruefenChannelNumber(){
 
 
 
-// ------------------------------------Setup-----------------------------------------
+// -----------------------------------------------------------------------------Setup----------------------------------------------------------------------------------
 void setup() {
   #ifdef EEPROMschreiben
     EEPROMschreibenErstesMal();
@@ -1665,6 +1580,7 @@ void setup() {
   // ------------------DMX-----------------------
   #ifdef FunktionDMX
     DMXSerial.init(DMXReceiver);  // Pin 2
+    //_DMX_setMode(RDATA);
   #endif
 
   // ------------------Taster-----------------------
@@ -1673,18 +1589,6 @@ void setup() {
   pinMode(TasteMODE, INPUT_PULLUP);
   pinMode(TasteENTER, INPUT_PULLUP);
 
-  #ifdef FunktionRelais
-    // ------------------Relais-----------------------
-    pinMode(relais_1, OUTPUT);
-    pinMode(relais_2, OUTPUT);
-    pinMode(relais_3, OUTPUT);
-    pinMode(relais_4, OUTPUT);
-    pinMode(relais_5, OUTPUT);
-    pinMode(relais_6, OUTPUT);
-  
-    RelaisStartWerte();
-  #endif
-  
 // ------------------Sound-----------------------
   #ifdef FunktionSound
   pinMode(sound_digital, INPUT);
@@ -1705,7 +1609,7 @@ void setup() {
   pruefenChannelNumber();
 }
 
-// ------------------------------------Loop-----------------------------------------
+// -----------------------------------------------------------------------------Loop----------------------------------------------------------------------------------
 void loop() {
   HauptMenu();
 }
