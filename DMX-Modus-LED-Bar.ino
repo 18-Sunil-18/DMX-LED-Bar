@@ -1,5 +1,3 @@
-#define FunktionLED
-#define FunktionSound
 #define FunktionDMX
 //#define FunktionSerial    // Wenn Aktiviert, FunktionDMX Deaktivieren
 //#define EEPROMschreiben
@@ -7,64 +5,20 @@
 // ------------------library-----------------------
 #include <Arduino.h>
 
-#ifdef FunktionLED
-  #include <Adafruit_NeoPixel.h>
-#endif
-
-#ifdef __AVR__
-  #include <avr/power.h>
-#endif
-
 // ------------------DMX-Werte-----------------------
 
-byte maxBrightness     = 200;    // brightness range [off..on] = [0..255], keep dim for less current draw
-volatile byte brightness,
-     strobe,
-     effect,
-     effectspeed,
-     redLevel_1,  // store the received channel level control data
-     grnLevel_1,
-     bluLevel_1;
-
-volatile byte Prevbrightness = 0,
-     PrevRedLevel_1 = 0,
-     PrevGreenLevel_1 = 0,
-     PrevBlueLevel_1 = 0;
+byte brightness;
 
 // ------------------DMX-Channel-----------------------
 
-byte brightnessCh      =   0,   // DMX channel offsets from base channel
-     strobeCh          =   1,
-     effectCh          =   2,
-     effectspeedCh     =   3,
-     redCh_1           =   4,   // CH7
-     grnCh_1           =   5,
-     bluCh_1           =   6;
-
-// Zeit für Strobe
-unsigned long prevMillStrobe = 0;
+byte dmxBaseCh	=	0,   // DMX channel offsets from base channel
+		 brightnessCh	=	1;
 
 // Zeit für DMX Auslesen
 unsigned long prevMillDMX = 0;
 
 // Zeit für Taster
 unsigned long previousMillis = 0;
-
-// Strobe Halbiert
-int StrobeHalb;
-
-// ------------------LED-----------------------
-
-#define PIN 13 // Hier wird angegeben, an welchem digitalen Pin die WS2812 LEDs bzw. NeoPixel angeschlossen sind
-#define NUMPIXELS 60 // Hier wird die AndmxBaseCh der angeschlossenen WS2812 LEDs bzw. NeoPixel angegeben
-int Pixel_0 = 0,
-    Abstand_Pixel = 1;
-
-int Segment_1a = 29;
-
-#ifdef FunktionLED
-  Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
-#endif
 
 // ------------------DMXSerial-----------------------
 
@@ -118,23 +72,6 @@ int TasteUP = 4,    // Pin vom Taster
     TasteENTER = 7,
     StatusTasteENTER;
 
-// ------------------Poti-----------------------
-#ifdef FunktionPoti
-int Poti_1 = A0,
-    Poti_2 = A1,
-    Poti_3 = A2,
-    Poti_4 = A3;
-
-int PotiWert_1,
-    PotiWert_2,
-    PotiWert_3,
-    PotiWert_4,
-    PotiWertNeu_1,
-    PotiWertNeu_2,
-    PotiWertNeu_3,
-    PotiWertNeu_4;
-#endif
-
 // ------------------Variabeln-----------------------
 int dmxBaseCh,    // DMX-Adresse
     stelle,
@@ -176,49 +113,21 @@ void ModeFunktion(){
 
   switch(ModeMenueZaehler){
     case 1:
-      AlleRot();
+      // Programmablauf
       break;
     case 2:
-      AlleGruen();
+      // Programmablauf
       break;
 }
 
-#ifdef FunktionLED
-// -------------------CH07------------------------------------------------------------------
-
-void ansteuern(int r, int g, int b){
-  if(Speicher_Channel == 7){
-    for(int x=Pixel_0; x<=NUMPIXELS; x++){
-      pixels.setPixelColor(x, pixels.Color(r,g,b));
-      pixels.show(); // Durchführen der Pixel-Ansteuerung
-    }
-  }
-}
-
-#endif
 
 #ifdef FunktionDMX
 void DMXauslesen(){
-  PrevRedLevel_1 = redLevel_1;  PrevGreenLevel_1 = grnLevel_1;  PrevBlueLevel_1 = bluLevel_1;
-  //Prevbrightness = brightness;
-
-  unsigned long curMillDMX = millis();
+    unsigned long curMillDMX = millis();
 
     delay(50);
-    effect = DMXSerial.read(dmxBaseCh + effectCh);     // Dmx Effect Wert auslesen
-    effectspeed = DMXSerial.read(dmxBaseCh + effectspeedCh);     // Dmx Effect Speed Wert auslesen
     
-    redLevel_1 = DMXSerial.read(dmxBaseCh + redCh_1);     // Dmx Rot Wert auslesen
-    grnLevel_1 = DMXSerial.read(dmxBaseCh + grnCh_1);     // Dmx Grün Wert auslesen
-    bluLevel_1 = DMXSerial.read(dmxBaseCh + bluCh_1);     // Dmx Blau Wert auslesen
-    
-    strobe = DMXSerial.read(dmxBaseCh + strobeCh);     // Dmx Strobe Wert auslesen
     brightness = DMXSerial.read(dmxBaseCh + brightnessCh);     // Dmx Dimmer Wert auslesen
-    brightness = map(brightness, 1, 255, 0, maxBrightness);   // Dimmer Wert runter rechnen
-
-    redLevel_1 = float(redLevel_1) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-    grnLevel_1 = float(grnLevel_1) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
-    bluLevel_1 = float(bluLevel_1) * (float(brightness) / float(maxBrightness));    // Dimmer auf Farbe anwenden
 }
 
 // -------------------------------------------------------------------------------------
