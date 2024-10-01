@@ -11,8 +11,7 @@ byte brightness;
 
 // ------------------DMX-Channel-----------------------
 
-byte dmxBaseCh	=	0,   // DMX channel offsets from base channel
-		 brightnessCh	=	1;
+byte brightnessCh		=	0;   // DMX channel offsets from base channel
 
 // Zeit für DMX Auslesen
 unsigned long prevMillDMX = 0;
@@ -59,8 +58,7 @@ int Adresse_0 = 0,    // Speicher DMX-Adresse
     Adresse_8 = 8,
     Adresse_9 = 9,    // Speicher DMX-Adresse
     Adresse_10 = 10,    // Speicher Hauptmenü DMX-Modus oder Autoprogramm
-    Adresse_11 = 11,    // Speicher Autoprogramm
-    Adresse_12 = 12;    // Speicher Channel Auswahl
+    Adresse_11 = 11;    // Speicher Autoprogramm
 
 // ------------------Taster-----------------------
 int TasteUP = 4,    // Pin vom Taster
@@ -79,13 +77,11 @@ int dmxBaseCh,    // DMX-Adresse
     ModeMenueZaehler,    // EEprom letzter Zustand
     Hauptmenuezaehler,    // EEprom letzter Zustand
     Hauptmenue,
-    chanel_nummer,    // Wert kommt aus/wird berechnet aus dem EEPROM
-    Speicher_Channel;
+    chanel_nummer;    // Wert kommt aus/wird berechnet aus dem EEPROM
 
 // Zwischenspeicher Hauptmenü Funktion (in welcher Funktion er ist)
 int DMX_Modus_Nix,
     DMX_Adresse_einstellen,
-    Channel_einstellen,
     Autoprogramme;
 
 // ------------Autoprogramme-------------------------------------------------------------------------
@@ -151,46 +147,6 @@ void ModeMenue(){     // Autoprogramm Wert zeigen A001
   #endif
 }
 
-// -------------------------------------------------------------------------------------
-
-void Channel(){     // Channel einstellen
-  display.setSegments(C, 1, 0);
-  TasterAuslesen();
-  if(StatusTasteUP == HIGH){   // Wenn UP gedrückt, dann
-    chanel_nummer++;
-  }
-  if(StatusTasteDOWN == HIGH){   // Wenn DOWN gedrückt, dann
-    chanel_nummer--;
-  }
-  pruefenChannel();
-  if(StatusTasteENTER == HIGH){   // Wenn Enter gedrückt, dann
-    EEPROM.write(Adresse_12, Speicher_Channel);   // Sperichere Wert im EEPROM
-    delay(100);
-  }
-  
-  switch(chanel_nummer){
-    case 1:   // CH07
-      display.showNumberDec(7, false, 4, 0);
-      Speicher_Channel = 7;
-      break;
-    case 2:   // CH10
-      display.showNumberDec(10, false, 4, 0);
-      Speicher_Channel = 10;
-      break;
-    case 3:   // CH16
-      display.showNumberDec(16, false, 4, 0);
-      Speicher_Channel = 16;
-      break;
-    case 4:   // CH22
-      display.showNumberDec(22, false, 4, 0);
-      Speicher_Channel = 22;
-      break;
-    case 5:   // CH28
-      display.showNumberDec(28, false, 4, 0);
-      Speicher_Channel = 28;
-      break;
-  }
-}
 
 void eepromauslesen(){
   #ifdef FunktionSerial
@@ -432,51 +388,6 @@ void EEPROMschreibenErstesMal(){
   EEPROM.write(Adresse_9, 0);EEPROM.write(Adresse_8, 0);EEPROM.write(Adresse_7, 0);EEPROM.write(Adresse_6, 0);EEPROM.write(Adresse_5, 0);EEPROM.write(Adresse_4, 0);EEPROM.write(Adresse_3, 0);EEPROM.write(Adresse_2, 0);EEPROM.write(Adresse_1, 0);EEPROM.write(Adresse_0, 1);   // Wert in den EEPROM schreiben
   EEPROM.write(Adresse_10, 1);    // Speicher Hauptmenü DMX-Modus oder Autoprogramm
   EEPROM.write(Adresse_11, 1);    // Speicher Autoprogramm
-  EEPROM.write(Adresse_12, 7);    // Speicher Channel Auswahl
-}
-
-// ------------------Poti-----------------------
-void AnalogLichtSteuern(){
-  #ifdef FunktionPoti
-  PotiAuslesen();
-  PotiWertBerechnen();
-  
-  for(int x=Pixel_0; x<=NUMPIXELS; x++){
-    pixels.setPixelColor(x, pixels.Color(PotiWertNeu_2, PotiWertNeu_3 ,PotiWertNeu_4)); // Pixel leuchtet in der Farbe Rot
-    pixels.show(); // Durchführen der Pixel-Ansteuerung
-  }
-  #endif
-}
-
-
-// -------------------------------------------------------------------------------------
-
-void Lauflicht_1(int wait_1_1, int wait_1_2){
-  int nummer = random(1, 8);
-  int wait_1_3 = random(wait_1_1, wait_1_2);
-  switch(nummer){
-    case 1:
-      AlleRot();  delay(wait_1_3);
-      break;
-    case 2:
-      AlleGruen();  delay(wait_1_3);
-      break;
-    case 3:
-      AlleBlau();  delay(wait_1_3);
-      break;
-    case 4:
-      AlleGelb();  delay(wait_1_3);
-      break;
-    case 5:
-      AlleTuerkis();  delay(wait_1_3);
-      break;
-    case 6:
-      AlleLila();  delay(wait_1_3);
-      break;
-    case 7:
-      AlleWeiss();  delay(wait_1_3);
-      break;
-  }
 }
 
 // ------------Hauptmenü-------------------------------------------------------------------------
@@ -520,7 +431,6 @@ void HauptMenu(){
           if(Hauptmenuezaehler >= 5){
             Hauptmenuezaehler = 1;
           }
-          AlleAus();
           return;
         }
       }
@@ -546,33 +456,9 @@ void HauptMenu(){
           }
           return;
         }
-      }
-      
+      }      
       break;
-    case 3:   // Channel einstellen
-      #ifdef FunktionSerial
-        Serial.println("Channel");
-      #endif
-      Channel_einstellen = 1;
-      display.setSegments(C, 1, 0);
-      while(Channel_einstellen == 1){
-        Channel();
-        
-        TasterAuslesen();
-        delay(100);
-        
-        if(StatusTasteMODE == HIGH){
-          delay(100);
-          Channel_einstellen = 0;
-          Hauptmenuezaehler++;
-          if(Hauptmenuezaehler >= 5){
-            Hauptmenuezaehler = 1;
-          }
-          return;
-        }
-      }
-      
-      break;
+
     case 4:   // Autoprogramme
       #ifdef FunktionSerial
         Serial.println("Autoprogramme");
@@ -590,25 +476,16 @@ void HauptMenu(){
           if(Hauptmenuezaehler >= 5){
             Hauptmenuezaehler = 1;
           }
-          AlleAus();
           return;
         }
       }
-      
       break;
   }
 }
 
 
 void DMXsteuern(){
-  int wait = map(effectspeed, 0, 255, 0, 75); // Wert, untere Grenze, obere Grenze, untere Grenze Ziel, obere Grenze Ziel
-    
-  if (effect < 9) {
-    #ifdef FunktionLED
-      //LedAnsteuern_1_8();
-      LedAnsteuern_11_88();
-    #endif
-    }
+  // Ansteuern (z.B. LED) der Empfangen DMX Wert
 }
 
 
@@ -679,47 +556,14 @@ void dmxBaseChberechnen(){
 }
 
 
-void pruefenModeMenu(){
+void pruefenModeMenu(){		// Autopragramm Anzahl
   if(ModeMenueZaehler < 1){
-    ModeMenueZaehler = 20;
+    ModeMenueZaehler = 4;
   }
-  if(ModeMenueZaehler >= 21){
+  if(ModeMenueZaehler >= 5){
     ModeMenueZaehler = 1;
   }
 }
-
-// -------------------------------------------------------------------------------------
-
-void pruefenChannel(){
-  if(chanel_nummer >= 6){
-    chanel_nummer = 1;
-  }
-  if(chanel_nummer < 1){
-    chanel_nummer = 5;
-  }
-}
-
-// -------------------------------------------------------------------------------------
-
-void pruefenChannelNumber(){
-  if(Speicher_Channel == 7){
-    chanel_nummer = 1;
-  }
-  if(Speicher_Channel == 10){
-    chanel_nummer = 2;
-  }
-  if(Speicher_Channel == 16){
-    chanel_nummer = 3;
-  }
-  if(Speicher_Channel == 22){
-    chanel_nummer = 4;
-  }
-  if(Speicher_Channel == 28){
-    chanel_nummer = 5;
-  }
-}
-
-
 
 // -----------------------------------------------------------------------------Setup----------------------------------------------------------------------------------
 void setup() {
@@ -731,12 +575,7 @@ void setup() {
     Serial.begin(9600);
   #endif
   
-  // ------------------LED-----------------------
-  #ifdef FunktionLED
-    pixels.begin(); // Initialisierung der NeoPixel
-  #endif
-
-  // ------------------DMX-----------------------
+	// ------------------DMX-----------------------
   #ifdef FunktionDMX
     DMXSerial.init(DMXReceiver);  // Pin 2
     //_DMX_setMode(RDATA);
@@ -757,9 +596,6 @@ void setup() {
   // Werte aus dem EEPROM lesen
   Hauptmenuezaehler = EEPROM.read(Adresse_10);
   ModeMenueZaehler = EEPROM.read(Adresse_11);
-  Speicher_Channel = EEPROM.read(Adresse_12);
-
-  pruefenChannelNumber();
 }
 
 // -----------------------------------------------------------------------------Loop----------------------------------------------------------------------------------
