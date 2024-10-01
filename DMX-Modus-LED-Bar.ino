@@ -1,3 +1,4 @@
+
 #define FunktionDMX
 //#define FunktionSerial    // Wenn Aktiviert, FunktionDMX Deaktivieren
 //#define EEPROMschreiben
@@ -11,7 +12,7 @@ byte brightness;
 
 // ------------------DMX-Channel-----------------------
 
-volatile byte brightnessCh =	0;   // DMX channel offsets from base channel
+volatile byte brightnessCh =  0;   // DMX channel offsets from base channel
 
 // Zeit für DMX Auslesen
 unsigned long prevMillDMX = 0;
@@ -114,6 +115,7 @@ void ModeFunktion(){
     case 2:
       // Programmablauf
       break;
+  }
 }
 
 
@@ -556,7 +558,7 @@ void dmxBaseChberechnen(){
 }
 
 
-void pruefenModeMenu(){		// Autopragramm Anzahl
+void pruefenModeMenu(){   // Autopragramm Anzahl
   if(ModeMenueZaehler < 1){
     ModeMenueZaehler = 4;
   }
@@ -575,7 +577,7 @@ void setup() {
     Serial.begin(9600);
   #endif
   
-	// ------------------DMX-----------------------
+  // ------------------DMX-----------------------
   #ifdef FunktionDMX
     DMXSerial.init(DMXReceiver);  // Pin 2
     //_DMX_setMode(RDATA);
