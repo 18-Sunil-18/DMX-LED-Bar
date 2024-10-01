@@ -399,7 +399,7 @@ void HauptMenu(){
     delay(100);
     Hauptmenue = 1;
     Hauptmenuezaehler++;
-    if(Hauptmenuezaehler >= 5){
+    if(Hauptmenuezaehler >= 4){
       Hauptmenuezaehler = 1;
     }
   }
@@ -428,7 +428,7 @@ void HauptMenu(){
           delay(100);
           DMX_Modus_Nix = 0;
           Hauptmenuezaehler++;
-          if(Hauptmenuezaehler >= 5){
+          if(Hauptmenuezaehler >= 4){
             Hauptmenuezaehler = 1;
           }
           return;
@@ -451,7 +451,7 @@ void HauptMenu(){
           delay(100);
           DMX_Adresse_einstellen = 0;
           Hauptmenuezaehler++;
-          if(Hauptmenuezaehler >= 5){
+          if(Hauptmenuezaehler >= 4){
             Hauptmenuezaehler = 1;
           }
           return;
@@ -473,7 +473,7 @@ void HauptMenu(){
           delay(100);
           Autoprogramme = 0;
           Hauptmenuezaehler++;
-          if(Hauptmenuezaehler >= 5){
+          if(Hauptmenuezaehler >= 4){
             Hauptmenuezaehler = 1;
           }
           return;
