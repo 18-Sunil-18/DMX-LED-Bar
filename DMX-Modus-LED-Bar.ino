@@ -24,54 +24,12 @@ volatile byte brightness,
      effectspeed,
      redLevel_1,  // store the received channel level control data
      grnLevel_1,
-     bluLevel_1,
-     redLevel_2,
-     grnLevel_2,
-     bluLevel_2,
-     redLevel_3,
-     grnLevel_3,
-     bluLevel_3,
-     redLevel_4,
-     grnLevel_4,
-     bluLevel_4,
-     redLevel_5,
-     grnLevel_5,
-     bluLevel_5,
-     redLevel_6,
-     grnLevel_6,
-     bluLevel_6,
-     redLevel_7,
-     grnLevel_7,
-     bluLevel_7,
-     redLevel_8,
-     grnLevel_8,
-     bluLevel_8;
+     bluLevel_1;
 
 volatile byte Prevbrightness = 0,
      PrevRedLevel_1 = 0,
      PrevGreenLevel_1 = 0,
-     PrevBlueLevel_1 = 0,
-     PrevRedLevel_2 = 0,
-     PrevGreenLevel_2 = 0,
-     PrevBlueLevel_2 = 0,
-     PrevRedLevel_3 = 0,
-     PrevGreenLevel_3 = 0,
-     PrevBlueLevel_3 = 0,
-     PrevRedLevel_4 = 0,
-     PrevGreenLevel_4 = 0,
-     PrevBlueLevel_4 = 0,
-     PrevRedLevel_5 = 0,
-     PrevGreenLevel_5 = 0,
-     PrevBlueLevel_5 = 0,
-     PrevRedLevel_6 = 0,
-     PrevGreenLevel_6 = 0,
-     PrevBlueLevel_6 = 0,
-     PrevRedLevel_7 = 0,
-     PrevGreenLevel_7 = 0,
-     PrevBlueLevel_7 = 0,
-     PrevRedLevel_8 = 0,
-     PrevGreenLevel_8 = 0,
-     PrevBlueLevel_8 = 0;
+     PrevBlueLevel_1 = 0;
 
 // ------------------DMX-Channel-----------------------
 
@@ -81,28 +39,7 @@ byte brightnessCh      =   0,   // DMX channel offsets from base channel
      effectspeedCh     =   3,
      redCh_1           =   4,   // CH7
      grnCh_1           =   5,
-     bluCh_1           =   6,
-     redCh_2           =   7,   // CH10
-     grnCh_2           =   8,
-     bluCh_2           =   9,
-     redCh_3           =   10,   // CH16
-     grnCh_3           =   11,
-     bluCh_3           =   12,
-     redCh_4           =   13,
-     grnCh_4           =   14,
-     bluCh_4           =   15,
-     redCh_5           =   16,   // CH22
-     grnCh_5           =   17,
-     bluCh_5           =   18,
-     redCh_6           =   19,
-     grnCh_6           =   20,
-     bluCh_6           =   21,
-     redCh_7           =   22,   // CH28
-     grnCh_7           =   23,
-     bluCh_7           =   24,
-     redCh_8           =   25,
-     grnCh_8           =   26,
-     bluCh_8           =   27;
+     bluCh_1           =   6;
 
 // Zeit für Strobe
 unsigned long prevMillStrobe = 0;
@@ -123,25 +60,7 @@ int StrobeHalb;
 int Pixel_0 = 0,
     Abstand_Pixel = 1;
 
-int Segment_1a = 29,    // CH 10
-
-    Segment_2a = 14,    // CH16
-    Segment_2b = 29,    // CH16
-    Segment_2c = 44,    // CH16
-    
-    Segment_3a = 9,   // CH 22 (9,19,29,39,49)
-    Segment_3b = 19,   // CH 22
-    Segment_3c = 29,   // CH 22
-    Segment_3d = 39,   // CH 22
-    Segment_3e = 49,   // CH 22
-    
-    Segment_4a = 7,    // CH 28 (7,14,21,28,35,42,50)
-    Segment_4b = 14,    // CH 28
-    Segment_4c = 21,    // CH 28
-    Segment_4d = 28,    // CH 28
-    Segment_4e = 35,    // CH 28
-    Segment_4f = 42,    // CH 28
-    Segment_4g = 50;    // CH 28
+int Segment_1a = 29;
 
 #ifdef FunktionLED
   Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
@@ -214,12 +133,6 @@ int PotiWert_1,
     PotiWertNeu_2,
     PotiWertNeu_3,
     PotiWertNeu_4;
-#endif
-
-// ------------------Sound-----------------------
-#ifdef FunktionSound
-int sound_digital = 8,
-    sound_analog = A0;
 #endif
 
 // ------------------Variabeln-----------------------
@@ -925,12 +838,6 @@ void setup() {
   pinMode(TasteDOWN, INPUT_PULLUP);
   pinMode(TasteMODE, INPUT_PULLUP);
   pinMode(TasteENTER, INPUT_PULLUP);
-
-// ------------------Sound-----------------------
-  #ifdef FunktionSound
-  pinMode(sound_digital, INPUT);
-  pinMode(sound_analog, INPUT);
-  #endif
 
   // ------------------Display-----------------------
   display.setBrightness(0x0f);
