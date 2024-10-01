@@ -11,7 +11,7 @@ byte brightness;
 
 // ------------------DMX-Channel-----------------------
 
-byte brightnessCh		=	0;   // DMX channel offsets from base channel
+volatile byte brightnessCh =	0;   // DMX channel offsets from base channel
 
 // Zeit für DMX Auslesen
 unsigned long prevMillDMX = 0;
