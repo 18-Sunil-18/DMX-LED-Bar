@@ -11,7 +11,7 @@ Und hier könnt ihr selber Platinen bestellen: [PCBWay](https://www.pcbway.com/)
 ![PCBWay-logo](https://github.com/18-Sunil-18/DMX-LED-Bar/assets/70856050/bb180489-bf78-4b87-9770-177828271f65)
 
 
-##Benötigte Bauteile:
+## Benötigte Bauteile:
 
 4x Taster 6x6mm
 
@@ -25,4 +25,4 @@ Und hier könnt ihr selber Platinen bestellen: [PCBWay](https://www.pcbway.com/)
 
 2x Buchsenleiste, gerade, 15pol, 2,54mm
 
-##[Video](https://youtu.be/DR7m4_L-1cg)
+## [Video](https://youtu.be/DR7m4_L-1cg)
