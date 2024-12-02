@@ -22,6 +22,7 @@ Und hier könnt ihr selber Platinen bestellen: [PCBWay](https://www.pcbway.com/)
 - 1x Max485
 - 1x IC-Sockel, 8-polig
 - 2x Buchsenleiste, gerade, 15pol, 2,54mm
+- 1x [TM1637](https://amazon.de/4-4-segment-Digital-tm1637-LED-verstellbare-Helligkeit/dp/B06XDJVBMV)
 
 
 ## Links
